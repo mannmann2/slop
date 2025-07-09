@@ -1,0 +1,8 @@
+pre-commit
+
+pandas
+
+lyricsgenius
+
+openai
+google-genai
