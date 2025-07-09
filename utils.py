@@ -1,14 +1,14 @@
-import re
 import logging
+import re
+import time
 from configparser import ConfigParser
 
 import requests
 from google import genai
 from openai import OpenAI
 
-
 config = ConfigParser()
-config.read('config.ini')
+config.read("config.ini")
 gemini_client = genai.Client(api_key=config["gemini"]["API_KEY"])
 openai_client = OpenAI(api_key=config["openai"]["API_KEY"])
 
@@ -26,40 +26,51 @@ def create_hashtag(text: str) -> str:
     Returns:
         The string with only alphanumeric characters.
     """
-    hash_text = re.sub(r'[^a-zA-Z0-9]', '', text.lower())
-    return '#' + hash_text if hash_text else ''
+    hash_text = re.sub(r"[^a-zA-Z0-9]", "", text.lower())
+    return "#" + hash_text if hash_text else ""
 
 
 def get_img_prompt(prompt: str) -> str:
 
     response = gemini_client.models.generate_content(
-        model="gemini-2.5-pro",
-        contents=prompt
+        model="gemini-2.5-pro", contents=prompt
     )
     return response.text
 
 
 def get_image(prompt: str) -> str | None:
+    """Generate an image using OpenAI's DALL-E 3 model with a retry mechanism.
 
-    try:
-        img = openai_client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            n=1,
-            size="1024x1024",
-            response_format="url"
-        )
-    except Exception as e:
-        logging.error(str(e))
-        return None
+    Args:
+        prompt: The text prompt for image generation.
 
+    Returns:
+        The URL of the generated image, or None if it fails after retries.
+    """
+    attempts = 2
+    for i in range(attempts):
+        try:
+            img = openai_client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                n=1,
+                size="1024x1024",
+                response_format="url",
+            )
+            print(f"dall-e revised prompt: {img.data[0].revised_prompt}")
 
-    print(img.data[0].revised_prompt)
+            url = img.data[0].url
+            print(f"Image URL: {url}")
+            return url
 
-    url = img.data[0].url
-    print(url)
+        except Exception as e:
+            # Wait a second before retrying
+            if i < attempts - 1:
+                time.sleep(1)
+            else:
+                logging.error(str(e))
 
-    return url
+    return None
 
 
 def get_wikidata(artist: str) -> str | None:
@@ -110,7 +121,9 @@ def get_wikidata(artist: str) -> str | None:
         logging.error(f"Wikidata entity request failed for QID '{qid}': {e}")
         return None
     except ValueError:
-        logging.error(f"Failed to decode JSON from Wikidata entity request for QID '{qid}'")
+        logging.error(
+            f"Failed to decode JSON from Wikidata entity request for QID '{qid}'"
+        )
         return None
 
     # Safely navigate the nested structure to find the Instagram username

@@ -1,29 +1,31 @@
-# token should be a object attribute automatically updated
-# load and store data in object values, pass reload=True to update
+# TODO load and store data in object values, pass reload=True to update
 
-import math
 import json
+import math
+
 import requests
 
 
 class Spotify:
 
-    redirect_uri = 'https://www.google.com'
+    redirect_uri = "https://www.google.com"
 
-    scope = '%20'.join([
-        "user-read-recently-played",
-        "user-top-read",
-        "user-library-read",
-        "playlist-modify-private",
-        "playlist-modify-public",
-        "user-read-email",
-        "user-read-currently-playing",
-        "user-read-playback-state",
-        "user-modify-playback-state",
-        "app-remote-control",
-        "streaming",
-        "user-follow-read"
-    ])
+    scope = "%20".join(
+        [
+            "user-read-recently-played",
+            "user-top-read",
+            "user-library-read",
+            "playlist-modify-private",
+            "playlist-modify-public",
+            "user-read-email",
+            "user-read-currently-playing",
+            "user-read-playback-state",
+            "user-modify-playback-state",
+            "app-remote-control",
+            "streaming",
+            "user-follow-read",
+        ]
+    )
 
     def __init__(self, client_id, client_secret, user=None):
 
@@ -31,7 +33,14 @@ class Spotify:
         self.client_secret = client_secret
         if user is None:
 
-            url = "https://accounts.spotify.com/authorize/?client_id=" + self.client_id + "&response_type=code&redirect_uri=" + self.redirect_uri + "&scope=" + self.scope
+            url = (
+                "https://accounts.spotify.com/authorize/?client_id="
+                + self.client_id
+                + "&response_type=code&redirect_uri="
+                + self.redirect_uri
+                + "&scope="
+                + self.scope
+            )
 
             print(url)
             print()
@@ -42,10 +51,12 @@ class Spotify:
                 "code": code,
                 "redirect_uri": self.redirect_uri,
                 "client_id": self.client_id,
-                "client_secret" : self.client_secret
+                "client_secret": self.client_secret,
             }
-            self.user = requests.post("https://accounts.spotify.com/api/token", data=data).json()
-            self.token = self.user['access_token']
+            self.user = requests.post(
+                "https://accounts.spotify.com/api/token", data=data
+            ).json()
+            self.token = self.user["access_token"]
         else:
             self.user = user
             self.refresh()
@@ -56,44 +67,42 @@ class Spotify:
         # self.user.update(user)
         # print(json.dumps(self.user))
 
-
-
-
     @property
     def headers(self):
         return {"Authorization": "Bearer " + self.token}
-
 
     def refresh(self):
         # print('Refreshing token and retrying...')
         data = {
             "grant_type": "refresh_token",
-            "refresh_token": self.user['refresh_token'],
+            "refresh_token": self.user["refresh_token"],
             "client_id": self.client_id,
-            "client_secret": self.client_secret
+            "client_secret": self.client_secret,
         }
         res = requests.post("https://accounts.spotify.com/api/token", data=data)
         js = res.json()
         if res.status_code == 400:
             print(js)
-        self.token = js['access_token']
-
+        self.token = js["access_token"]
 
     def _make_request(self, url):
 
-        js = requests.get(url, headers=self.headers).json()
+        res = requests.get(url, headers=self.headers)
 
-        if 'error' in js:
-            if js['error']['message'] == "The access token expired":
+        if res.status_code == 204:
+            return None
+
+        js = res.json()
+        if "error" in js:
+            if js["error"]["message"] == "The access token expired":
                 self.refresh()
                 return self._make_request(url)
             else:
-                raise('error here:', js)
+                raise ("error here:", js)
             # elif js['error']['message'] == "Permissions missing":
             #     return None
         else:
             return js
-
 
     def get_recent(self):
         url = "https://api.spotify.com/v1/me/player/recently-played?limit=50"
@@ -110,30 +119,26 @@ class Spotify:
 
         return res
 
-
     def get_artists(self, ids):
 
         artists = []
         for i in range(0, len(ids), 50):
-            some_ids = ','.join(ids[i:i+50])
+            some_ids = ",".join(ids[i : i + 50])
             url = "https://api.spotify.com/v1/artists?ids=" + some_ids
             res = self._make_request(url)
-            print('.', end='')
-            artists += res['artists']
+            print(".", end="")
+            artists += res["artists"]
         return artists
 
-
     def get_albums(self, ids):  # to loop 50
-        ids = ','.join(ids)
+        ids = ",".join(ids)
         url = "https://api.spotify.com/v1/albums?ids=" + ids
         return self._make_request(url)
 
-
     def get_tracks(self, ids):  # to loop 50
-        ids = ','.join(ids)
+        ids = ",".join(ids)
         url = "https://api.spotify.com/v1/tracks?ids=" + ids
         return self._make_request(url)
-
 
     def following(self):
 
@@ -142,17 +147,16 @@ class Spotify:
 
         artists = []
         while True:
-            artists += res['artists']['items']
+            artists += res["artists"]["items"]
 
-            if res['artists']['next']:
-                url = res['artists']['next']
+            if res["artists"]["next"]:
+                url = res["artists"]["next"]
                 res = self._make_request(url)
-                print('.', end='')
+                print(".", end="")
             else:
                 break
 
         return artists
-
 
     def saved_tracks(self):
 
@@ -161,17 +165,16 @@ class Spotify:
 
         tracks = []
         while True:
-            tracks += res['items']
+            tracks += res["items"]
 
-            if res['next']:
-                url = res['next']
+            if res["next"]:
+                url = res["next"]
                 res = self._make_request(url)
-                print('.', end='')
+                print(".", end="")
             else:
                 break
 
         return tracks
-
 
     def get_saved_albums(self):
 
@@ -180,41 +183,38 @@ class Spotify:
 
         saved_albums = []
         while True:
-            saved_albums += js['items']
+            saved_albums += js["items"]
 
-            if js['next']:
-                print('.', end='')
-                js = self._make_request(js['next'])
+            if js["next"]:
+                print(".", end="")
+                js = self._make_request(js["next"])
             else:
                 break
 
         return saved_albums
 
-
     def get_audio_features(self, ids):
 
         features = []
         for i in range(0, len(ids), 50):
-            some_ids = ','.join(ids[i:i+50])
+            some_ids = ",".join(ids[i : i + 50])
             url = "https://api.spotify.com/v1/audio-features?ids=" + some_ids
             res = self._make_request(url)
-            print('.', end='')
-            features += res['audio_features']
+            print(".", end="")
+            features += res["audio_features"]
         return features
-
 
     def add_to_playlist(self, ids, playlist_id):
 
-        for i in range(math.ceil(len(ids)/100)):
+        for i in range(math.ceil(len(ids) / 100)):
 
-            uris = ids[i*100:(i+1)*100]
+            uris = ids[i * 100 : (i + 1) * 100]
 
             res = requests.post(
-                f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks',
+                f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
                 headers=self.headers,
-                data=json.dumps({'uris': uris})
+                data=json.dumps({"uris": uris}),
             )
-
 
     # def get_audio_analysis(self, id):
     #     url = "https://api.spotify.com/v1/audio-analysis/" + id + "?access_token=" + token
