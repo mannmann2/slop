@@ -4,13 +4,18 @@ import time
 from configparser import ConfigParser
 
 import requests
-from google import genai
+from google.genai import Client
+from lyricsgenius import Genius
 from openai import OpenAI
 
 config = ConfigParser()
 config.read("config.ini")
-gemini_client = genai.Client(api_key=config["gemini"]["API_KEY"])
+
+gemini_client = Client(api_key=config["gemini"]["API_KEY"])
 openai_client = OpenAI(api_key=config["openai"]["API_KEY"])
+
+genius_client = Genius(access_token=config["genius"]["TOKEN"])
+genius_client.verbose = False
 
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 INSTAGRAM_PROPERTY_ID = "P2003"  # P2003 is the Wikidata property for Instagram username
@@ -73,7 +78,15 @@ def get_image(prompt: str) -> str | None:
     return None
 
 
-def get_wikidata(artist: str) -> str | None:
+def get_lyrics(song: str, artist: str) -> str | None:
+    song = genius_client.search_song(song, artist)
+    if song:
+        return song.lyrics.split("Lyrics", 1)[1].split("You might also like")[0]
+    else:
+        return None
+
+
+def get_handle(artist: str) -> str | None:
     """
     Searches Wikidata for an artist and retrieves their Instagram username if available.
 

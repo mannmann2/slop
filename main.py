@@ -6,10 +6,9 @@ from configparser import ConfigParser
 import pandas as pd
 
 from constants import CAPTION, IMG_PROMPT
-from genius import Genius
 from instagram import Instagram
 from spotify import Spotify
-from utils import create_hashtag, get_image, get_img_prompt, get_wikidata
+from utils import create_hashtag, get_handle, get_image, get_img_prompt, get_lyrics
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -20,7 +19,6 @@ config.read("config.ini")
 
 IG_ID = config["instagram"]["IG_ID"]
 INSTA_TOKEN = config["instagram"]["TOKEN"]
-GENIUS_TOKEN = config["genius"]["TOKEN"]
 
 CLIENT_ID = config["spotify"]["CLIENT_ID"]
 CLIENT_SECRET = config["spotify"]["CLIENT_SECRET"]
@@ -34,7 +32,6 @@ with open("user.json", "r") as f:
 
 spot = Spotify(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, user=user)
 insta = Instagram(IG_ID, INSTA_TOKEN)
-gen = Genius(token=GENIUS_TOKEN)
 
 while True:
     # try:
@@ -62,7 +59,7 @@ while True:
         gen_img_url = None
         image_url = item["item"]["album"]["images"][0]["url"]
 
-        lyrics_str = gen.get_lyrics(new_row["track"], new_row["artist"]) or ""
+        lyrics_str = get_lyrics(new_row["track"], new_row["artist"]) or ""
 
         # gen img flow
         if lyrics_str:
@@ -94,7 +91,7 @@ while True:
             lyrics_str += "\n\n"
 
         # get handle and hashtags
-        handle = get_wikidata(new_row["artist"])
+        handle = get_handle(new_row["artist"])
         if handle:
             hash_items = item["item"]["artists"] + [item["item"]["album"]]
             artist_tag = "@" + handle
