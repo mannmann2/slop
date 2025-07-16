@@ -114,9 +114,6 @@ class Spotify:
         url = "https://api.spotify.com/v1/me/player/currently-playing"
         res = self._make_request(url)
 
-        with open("current.json", "w") as f:
-            json.dump(res, f)
-
         return res
 
     def get_artists(self, ids):
