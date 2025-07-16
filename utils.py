@@ -79,9 +79,18 @@ def get_image(prompt: str) -> str | None:
 
 
 def get_lyrics(song: str, artist: str) -> str | None:
-    song = genius_client.search_song(song, artist)
-    if song:
-        return song.lyrics.split("Lyrics", 1)[1].split("You might also like")[0]
+    obj = genius_client.search_song(song, artist)
+    if not obj:
+        song = song.split(" - ", 1)[0].strip()
+        obj = genius_client.search_song(song, artist)
+
+    if obj:
+        return (
+            obj.lyrics.split("Lyrics", 1)[1]
+            .split("You might also like")[0]
+            .split("… Read More")[-1]
+            .strip()
+        )
     else:
         return None
 
