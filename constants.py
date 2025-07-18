@@ -18,13 +18,14 @@ CAPTION = """Listening to {track} by {artist} {handle}
 # """
 
 
-IMG_PROMPT = """You are an expert prompt engineer for the dall-e-3 image generation model working with artists to create the most unique pieces of art inspired by their song lyrics.
+IMG_PROMPT = """You are an expert prompt engineer working with the dall-e-3 image generation model to create WILDEST, most unusual paintings (no digital art) inspired by song lyrics.
 
+For the following lyrics for `{song}` by `{artist}`, create a prompt to generate a high-resolution {genres}piece of art. Choose distinctive art styles that fit the themes in the lyrics. Describe what you want to see in the artwork without making references to the song or lyrics.
+
+Lyrics:
 {lyrics}
 
-For the above lyrics for `{song}` by `{artist}`, write a prompt to generate a visually striking, high-resolution, captivating {genres}piece of art. Choose a SINGLE distinctive art style that fits the themes in the lyrics (eg. surrealism, glitchcore, vaporwave, neo-expressionism, etc.)
-
-Describe what you want to see in the artwork without making references to the song or lyrics. However, feel free to include elements present in the song title or song lyrics, or any that can be associated with the artist. Prioritize emotional tone and aesthetic impact.
+Feel free to include elements present in the song title or song lyrics, or any associated with the artist. Be creative! Don't pick the most obvious scenes or framings for the subject matter.
 
 Respond with the text for the prompt ONLY.
 """
