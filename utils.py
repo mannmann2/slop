@@ -38,7 +38,7 @@ def create_hashtag(text: str) -> str:
 def get_img_prompt(prompt: str) -> str:
 
     response = gemini_client.models.generate_content(
-        model="gemini-2.5-pro", contents=prompt
+        model=config["gemini"]["MODEL"], contents=prompt
     )
     return response.text
 
@@ -56,10 +56,11 @@ def get_image(prompt: str) -> str | None:
     for i in range(attempts):
         try:
             img = openai_client.images.generate(
-                model="dall-e-3",
+                model=config["openai"]["MODEL"],
                 prompt=prompt,
                 n=1,
                 size="1024x1024",
+                quality="standard",
                 response_format="url",
             )
             print(f"dall-e revised prompt: {img.data[0].revised_prompt}")
@@ -113,7 +114,9 @@ def get_handle(artist: str) -> str | None:
         "format": "json",
     }
     try:
-        response = requests.get(WIKIDATA_API_URL, params=search_params)
+        # Wikidata API requires a User-Agent header to avoid 403 Forbidden errors
+        headers = {"User-Agent": "Slop/1.0 (https://github.com/mannmann2/slop)"}
+        response = requests.get(WIKIDATA_API_URL, params=search_params, headers=headers)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
         search_results = response.json()
     except requests.exceptions.RequestException as e:
@@ -136,7 +139,8 @@ def get_handle(artist: str) -> str | None:
         "props": "claims",
     }
     try:
-        response = requests.get(WIKIDATA_API_URL, params=entity_params)
+        headers = {"User-Agent": "Slop/1.0 (https://github.com/mannmann2/slop)"}
+        response = requests.get(WIKIDATA_API_URL, params=entity_params, headers=headers)
         response.raise_for_status()
         entity_data = response.json()
     except requests.exceptions.RequestException as e:

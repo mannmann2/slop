@@ -2,6 +2,7 @@ import requests
 
 
 class Instagram:
+    """Link to docs: https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media"""
 
     base_url = "https://graph.instagram.com/v23.0"
 

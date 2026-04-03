@@ -55,9 +55,10 @@ while True:
         # if artwork not in last 30 played items
         # recent_album_ids = df["album_id"].drop_duplicates(keep="last").tail(30x).values
         recent_album_ids = df.tail(30)["album_id"].values
-        if album_id not in recent_album_ids and (
-            current["context"]["type"] != "album"
-            or current["context"]["uri"] == current["item"]["album"]["uri"]
+        if (
+            album_id not in recent_album_ids
+            and current["context"]["type"] == "album"
+            and current["context"]["uri"] == current["item"]["album"]["uri"]
         ):
 
             logging.info("Preparing new post...")
@@ -153,6 +154,7 @@ while True:
                 logging.info(f"Created container: {res}")
 
             # publish content
+            time.sleep(10)
             res = insta.post_media(res["id"])
             logging.info(f"Posted media: {res}")
 
