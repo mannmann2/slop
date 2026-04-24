@@ -80,18 +80,18 @@ def get_image(prompt: str) -> str | None:
 
 
 def get_lyrics(song: str, artist: str) -> str | None:
-    obj = genius_client.search_song(song, artist)
+    try:
+        obj = genius_client.search_song(song, artist)
+    except requests.exceptions.ConnectionError as e:
+        logging.info(f"Retrying after error: {str(e)}")
+        obj = genius_client.search_song(song, artist)
+
     if not obj:
         song = song.split(" - ", 1)[0].strip()
         obj = genius_client.search_song(song, artist)
 
     if obj:
-        return (
-            obj.lyrics.split("Lyrics", 1)[1]
-            .split("You might also like")[0]
-            .split("… Read More")[-1]
-            .strip()
-        )
+        return obj.lyrics.strip()
     else:
         return None
 

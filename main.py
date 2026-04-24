@@ -100,6 +100,9 @@ while True:
 
                 lyrics_str += "\n\n"
 
+            else:
+                logging.info("No lyrics found...")
+
             # get handle and hashtags
             handle = get_handle(artist)
             if handle:
@@ -129,6 +132,20 @@ while True:
 
             # upload content
             if gen_img_url:
+
+                # update archive
+                new_row = {
+                    "track": track,
+                    "album": album,
+                    "artist": artist,
+                    "track_id": current["item"]["id"],
+                    "album_id": album_id,
+                }
+                last_row = df.iloc[-1] if not df.empty else None
+                if last_row is None or any(last_row[col] != new_row[col] for col in new_row):
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                    df.to_csv("archive.tsv", index=False, sep="\t")
+
                 # add img prompt to alt text if within char limit
                 alt_text = img_prompt if len(img_prompt) <= 1000 else None
                 img1 = insta.create_container(
@@ -147,29 +164,16 @@ while True:
                 )
                 logging.info(f"Created carousel: {res}")
 
-            else:
-                res = insta.create_container(
-                    url=image_url, caption=caption, user_tag=handle
-                )
-                logging.info(f"Created container: {res}")
+            # else:
+            #     res = insta.create_container(
+            #         url=image_url, caption=caption, user_tag=handle
+            #     )
+            #     logging.info(f"Created container: {res}")
 
-            # publish content
-            time.sleep(10)
-            res = insta.post_media(res["id"])
-            logging.info(f"Posted media: {res}")
-
-        # update archive
-        new_row = {
-            "track": track,
-            "album": album,
-            "artist": artist,
-            "track_id": current["item"]["id"],
-            "album_id": album_id,
-        }
-        last_row = df.iloc[-1] if not df.empty else None
-        if last_row is None or any(last_row[col] != new_row[col] for col in new_row):
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            df.to_csv("archive.tsv", index=False, sep="\t")
+                # publish content
+                time.sleep(10)
+                res = insta.post_media(res["id"])
+                logging.info(f"Posted media: {res}")
 
     except Exception as e:
         print("Error:", str(e))

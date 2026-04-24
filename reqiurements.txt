@@ -5,4 +5,4 @@ pandas
 lyricsgenius
 
 openai
-google-genai
+google-genai==1.70.0
