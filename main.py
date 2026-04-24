@@ -4,6 +4,7 @@ import time
 from configparser import ConfigParser
 
 import pandas as pd
+import requests
 
 from constants import CAPTION, IMG_PROMPT
 from instagram import Instagram
@@ -22,6 +23,41 @@ INSTA_TOKEN = config["instagram"]["TOKEN"]
 
 CLIENT_ID = config["spotify"]["CLIENT_ID"]
 CLIENT_SECRET = config["spotify"]["CLIENT_SECRET"]
+
+CDN_BASE = "http://192.168.0.5:8000"
+CDN_PASSWORD = config["cdn"]["PASSWORD"]
+
+_cdn_token: str | None = None
+_cdn_token_expiry: float = 0.0
+
+
+def _get_cdn_token() -> str:
+    global _cdn_token, _cdn_token_expiry
+    if _cdn_token and time.time() < _cdn_token_expiry:
+        return _cdn_token
+    resp = requests.post(
+        f"{CDN_BASE}/api/auth/login",
+        json={"password": CDN_PASSWORD},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    _cdn_token = resp.json()["token"]
+    _cdn_token_expiry = time.time() + 29 * 24 * 3600  # refresh a day early
+    return _cdn_token
+
+
+def upload_to_cdn(image_url: str) -> None:
+    token = _get_cdn_token()
+    img_bytes = requests.get(image_url, timeout=30).content
+    resp = requests.post(
+        f"{CDN_BASE}/api/cdn/upload",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"files": ("photo.jpg", img_bytes, "image/jpeg")},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    logging.info(f"CDN upload response: {resp.json()}")
+
 
 ENABLE_GENAI = True
 GEN_IMG_URL = None
@@ -142,9 +178,19 @@ while True:
                     "album_id": album_id,
                 }
                 last_row = df.iloc[-1] if not df.empty else None
-                if last_row is None or any(last_row[col] != new_row[col] for col in new_row):
+                if last_row is None or any(
+                    last_row[col] != new_row[col] for col in new_row
+                ):
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     df.to_csv("archive.tsv", index=False, sep="\t")
+
+                # upload generated image to CDN before posting
+                try:
+                    upload_to_cdn(gen_img_url)
+                except Exception as cdn_err:
+                    logging.warning(
+                        f"CDN upload failed (continuing with Instagram post): {cdn_err}"
+                    )
 
                 # add img prompt to alt text if within char limit
                 alt_text = img_prompt if len(img_prompt) <= 1000 else None
@@ -164,11 +210,11 @@ while True:
                 )
                 logging.info(f"Created carousel: {res}")
 
-            # else:
-            #     res = insta.create_container(
-            #         url=image_url, caption=caption, user_tag=handle
-            #     )
-            #     logging.info(f"Created container: {res}")
+                # else:
+                #     res = insta.create_container(
+                #         url=image_url, caption=caption, user_tag=handle
+                #     )
+                #     logging.info(f"Created container: {res}")
 
                 # publish content
                 time.sleep(10)
