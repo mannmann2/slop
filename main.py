@@ -134,7 +134,6 @@ while True:
                     print(img_prompt)
 
                     gen_img_bytes = get_image(img_prompt)
-                    # gen_img_bytes = get_image("DO NOT CHANGE THE FOLLOWING PROMPT:\n" + img_prompt)
 
                 lyrics_str += "\n\n"
 
