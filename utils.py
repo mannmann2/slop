@@ -45,7 +45,7 @@ def get_img_prompt(prompt: str) -> str:
 
 
 def get_image(prompt: str) -> bytes | None:
-    """Generate an image using OpenAI's gpt-image-1 model with a retry mechanism.
+    """Generate an image using OpenAI's gpt-image-2 model with a retry mechanism.
 
     Args:
         prompt: The text prompt for image generation.
@@ -57,11 +57,11 @@ def get_image(prompt: str) -> bytes | None:
     for i in range(attempts):
         try:
             img = openai_client.images.generate(
-                model="gpt-image-1",
+                model="gpt-image-2",
                 prompt=prompt,
                 n=1,
                 size="1024x1024",
-                quality="medium",
+                quality="low",
             )
             return base64.b64decode(img.data[0].b64_json)
 
