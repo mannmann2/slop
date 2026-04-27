@@ -46,17 +46,18 @@ def _get_cdn_token() -> str:
     return _cdn_token
 
 
-def upload_to_cdn(image_url: str) -> None:
+def upload_to_cdn(image_bytes: bytes) -> str:
     token = _get_cdn_token()
-    img_bytes = requests.get(image_url, timeout=30).content
     resp = requests.post(
         f"{CDN_BASE}/api/cdn/upload",
         headers={"Authorization": f"Bearer {token}"},
-        files={"files": ("photo.jpg", img_bytes, "image/jpeg")},
+        files={"files": ("photo.jpg", image_bytes, "image/jpeg")},
         timeout=30,
     )
     resp.raise_for_status()
-    logging.info(f"CDN upload response: {resp.json()}")
+    data = resp.json()
+    logging.info(f"CDN upload response: {data}")
+    return f"{CDN_BASE}{data['files'][0]['url']}"
 
 
 ENABLE_GENAI = True
@@ -99,7 +100,8 @@ while True:
 
             logging.info("Preparing new post...")
 
-            gen_img_url = None
+            gen_img_bytes = None
+            img_prompt = ""
             image_url = current["item"]["album"]["images"][0]["url"]
 
             lyrics_str = get_lyrics(track, artist) or ""
@@ -107,7 +109,7 @@ while True:
             # gen img flow
             if lyrics_str:
                 if GEN_IMG_URL:
-                    gen_img_url = GEN_IMG_URL
+                    gen_img_bytes = requests.get(GEN_IMG_URL, timeout=30).content
                     img_prompt = ""
 
                 elif ENABLE_GENAI:
@@ -131,8 +133,7 @@ while True:
                     print()
                     print(img_prompt)
 
-                    gen_img_url = get_image(img_prompt)
-                    # gen_img_url = get_image("DO NOT CHANGE THE FOLLOWING PROMPT:\n" + img_prompt)
+                    gen_img_bytes = get_image(img_prompt)
 
                 lyrics_str += "\n\n"
 
@@ -167,7 +168,7 @@ while True:
                 )
 
             # upload content
-            if gen_img_url:
+            if gen_img_bytes:
 
                 # update archive
                 new_row = {
@@ -184,42 +185,42 @@ while True:
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     df.to_csv("archive.tsv", index=False, sep="\t")
 
-                # upload generated image to CDN before posting
+                # upload generated image to CDN and use returned URL for Instagram
                 try:
-                    upload_to_cdn(gen_img_url)
+                    cdn_img_url = upload_to_cdn(gen_img_bytes)
                 except Exception as cdn_err:
-                    logging.warning(
-                        f"CDN upload failed (continuing with Instagram post): {cdn_err}"
+                    logging.error(f"CDN upload failed, skipping Instagram post: {cdn_err}")
+                    cdn_img_url = None
+
+                if cdn_img_url:
+                    # add img prompt to alt text if within char limit
+                    alt_text = img_prompt if len(img_prompt) <= 1000 else None
+                    img1 = insta.create_container(
+                        url=cdn_img_url,
+                        is_carousel=True,
+                        user_tag=handle,
+                        alt_text=alt_text,
                     )
+                    logging.info(f"Created gen img container: {img1}")
 
-                # add img prompt to alt text if within char limit
-                alt_text = img_prompt if len(img_prompt) <= 1000 else None
-                img1 = insta.create_container(
-                    url=gen_img_url,
-                    is_carousel=True,
-                    user_tag=handle,
-                    alt_text=alt_text,
-                )
-                logging.info(f"Created gen img container: {img1}")
+                    img2 = insta.create_container(url=image_url, is_carousel=True)
+                    logging.info(f"Created album container: {img2}")
 
-                img2 = insta.create_container(url=image_url, is_carousel=True)
-                logging.info(f"Created album container: {img2}")
+                    res = insta.create_carousel(
+                        caption=caption, children=[img1["id"], img2["id"]], user_tag=handle
+                    )
+                    logging.info(f"Created carousel: {res}")
 
-                res = insta.create_carousel(
-                    caption=caption, children=[img1["id"], img2["id"]], user_tag=handle
-                )
-                logging.info(f"Created carousel: {res}")
+                    # else:
+                    #     res = insta.create_container(
+                    #         url=image_url, caption=caption, user_tag=handle
+                    #     )
+                    #     logging.info(f"Created container: {res}")
 
-                # else:
-                #     res = insta.create_container(
-                #         url=image_url, caption=caption, user_tag=handle
-                #     )
-                #     logging.info(f"Created container: {res}")
-
-                # publish content
-                time.sleep(10)
-                res = insta.post_media(res["id"])
-                logging.info(f"Posted media: {res}")
+                    # publish content
+                    time.sleep(10)
+                    res = insta.post_media(res["id"])
+                    logging.info(f"Posted media: {res}")
 
     except Exception as e:
         print("Error:", str(e))

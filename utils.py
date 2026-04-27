@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 import time
@@ -43,34 +44,28 @@ def get_img_prompt(prompt: str) -> str:
     return response.text
 
 
-def get_image(prompt: str) -> str | None:
-    """Generate an image using OpenAI's DALL-E 3 model with a retry mechanism.
+def get_image(prompt: str) -> bytes | None:
+    """Generate an image using OpenAI's gpt-image-2 model with a retry mechanism.
 
     Args:
         prompt: The text prompt for image generation.
 
     Returns:
-        The URL of the generated image, or None if it fails after retries.
+        The image as bytes, or None if it fails after retries.
     """
     attempts = 2
     for i in range(attempts):
         try:
             img = openai_client.images.generate(
-                model=config["openai"]["MODEL"],
+                model="gpt-image-2",
                 prompt=prompt,
                 n=1,
                 size="1024x1024",
-                quality="standard",
-                response_format="url",
+                quality="low",
             )
-            print(f"dall-e revised prompt: {img.data[0].revised_prompt}")
-
-            url = img.data[0].url
-            print(f"Image URL: {url}")
-            return url
+            return base64.b64decode(img.data[0].b64_json)
 
         except Exception as e:
-            # Wait a second before retrying
             if i < attempts - 1:
                 time.sleep(1)
             else:
