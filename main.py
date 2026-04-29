@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import time
@@ -24,40 +25,35 @@ INSTA_TOKEN = config["instagram"]["TOKEN"]
 CLIENT_ID = config["spotify"]["CLIENT_ID"]
 CLIENT_SECRET = config["spotify"]["CLIENT_SECRET"]
 
-CDN_BASE = "http://192.168.0.5:8000"
-CDN_PASSWORD = config["cdn"]["PASSWORD"]
-
-_cdn_token: str | None = None
-_cdn_token_expiry: float = 0.0
+GITHUB_TOKEN = config["github"]["TOKEN"]
+GITHUB_REPO = config["github"]["REPO"]
+GITHUB_PATH = config["github"]["PATH"].strip("/")
 
 
-def _get_cdn_token() -> str:
-    global _cdn_token, _cdn_token_expiry
-    if _cdn_token and time.time() < _cdn_token_expiry:
-        return _cdn_token
-    resp = requests.post(
-        f"{CDN_BASE}/api/auth/login",
-        json={"password": CDN_PASSWORD},
-        timeout=10,
-    )
+def commit_image_to_github(image_bytes: bytes) -> str:
+    filename = f"{int(time.time())}.jpg"
+    file_path = f"{GITHUB_PATH}/{filename}" if GITHUB_PATH else filename
+
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+
+    check = requests.get(api_url, headers=headers, timeout=10)
+    body: dict = {
+        "message": f"Add generated image {filename}",
+        "content": base64.b64encode(image_bytes).decode(),
+    }
+    if check.status_code == 200:
+        body["sha"] = check.json()["sha"]
+
+    resp = requests.put(api_url, headers=headers, json=body, timeout=30)
     resp.raise_for_status()
-    _cdn_token = resp.json()["token"]
-    _cdn_token_expiry = time.time() + 29 * 24 * 3600  # refresh a day early
-    return _cdn_token
-
-
-def upload_to_cdn(image_bytes: bytes) -> str:
-    token = _get_cdn_token()
-    resp = requests.post(
-        f"{CDN_BASE}/api/cdn/upload",
-        headers={"Authorization": f"Bearer {token}"},
-        files={"files": ("photo.jpg", image_bytes, "image/jpeg")},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    logging.info(f"CDN upload response: {data}")
-    return f"{CDN_BASE}{data['files'][0]['url']}"
+    url = resp.json()["content"]["download_url"]
+    logging.info(f"GitHub commit: {url}")
+    return url
 
 
 ENABLE_GENAI = True
@@ -185,18 +181,18 @@ while True:
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     df.to_csv("archive.tsv", index=False, sep="\t")
 
-                # upload generated image to CDN and use returned URL for Instagram
+                # commit generated image to GitHub and use returned URL for Instagram
                 try:
-                    cdn_img_url = upload_to_cdn(gen_img_bytes)
-                except Exception as cdn_err:
-                    logging.error(f"CDN upload failed, skipping Instagram post: {cdn_err}")
-                    cdn_img_url = None
+                    img_url = commit_image_to_github(gen_img_bytes)
+                except Exception as gh_err:
+                    logging.error(f"GitHub commit failed, skipping Instagram post: {gh_err}")
+                    img_url = None
 
-                if cdn_img_url:
+                if img_url:
                     # add img prompt to alt text if within char limit
                     alt_text = img_prompt if len(img_prompt) <= 1000 else None
                     img1 = insta.create_container(
-                        url=cdn_img_url,
+                        url=img_url,
                         is_carousel=True,
                         user_tag=handle,
                         alt_text=alt_text,
