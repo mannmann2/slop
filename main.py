@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import re
 import time
 from configparser import ConfigParser
 
@@ -30,8 +31,15 @@ GITHUB_REPO = config["github"]["REPO"]
 GITHUB_PATH = config["github"]["PATH"].strip("/")
 
 
-def commit_image_to_github(image_bytes: bytes) -> str:
-    filename = f"{int(time.time())}.jpg"
+def _sanitize(text: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_")
+
+
+def commit_image_to_github(
+    image_bytes: bytes, artist: str, track: str, img_prompt: str = ""
+) -> str:
+    timestamp = int(time.time())
+    filename = f"{timestamp}_{_sanitize(artist)}_{_sanitize(track)}.jpg"
     file_path = f"{GITHUB_PATH}/{filename}" if GITHUB_PATH else filename
 
     headers = {
@@ -41,9 +49,13 @@ def commit_image_to_github(image_bytes: bytes) -> str:
     }
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
 
+    commit_message = f"Add generated image for {artist} - {track}"
+    if img_prompt:
+        commit_message += f"\n\nPrompt: {img_prompt}"
+
     check = requests.get(api_url, headers=headers, timeout=10)
     body: dict = {
-        "message": f"Add generated image {filename}",
+        "message": commit_message,
         "content": base64.b64encode(image_bytes).decode(),
     }
     if check.status_code == 200:
@@ -183,7 +195,7 @@ while True:
 
                 # commit generated image to GitHub and use returned URL for Instagram
                 try:
-                    img_url = commit_image_to_github(gen_img_bytes)
+                    img_url = commit_image_to_github(gen_img_bytes, artist, track, img_prompt)
                 except Exception as gh_err:
                     logging.error(f"GitHub commit failed, skipping Instagram post: {gh_err}")
                     img_url = None
